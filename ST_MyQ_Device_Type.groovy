@@ -62,7 +62,7 @@ metadata
         capability "Momentary"
         capability "Actuator"
         
-        attribute "doorStatus", "string"
+        attribute "doorStatus", "string"  // No longer used - we3 are exp[ected to report door status in "device.status"
 //        attribute "vacationStatus", "string"
         attribute "lastDoorAction", "string"
         
@@ -73,7 +73,6 @@ metadata
         command "getDoorStatus"
         command "openDoor"
         command "closeDoor"
-//        command "push"
 	}
 
 	simulator 
@@ -230,7 +229,6 @@ def open()
     def dInitStatus
     def dCurrentStatus = "opening"
     
-    	
     checkLogin()
     getDoorStatus() { dStatus -> dInitStatus = dStatus }
                    
@@ -243,7 +241,6 @@ def open()
 
 	while (dCurrentStatus == "opening")
     {
-    	checkLogin()		// we might have exceeded our allotted time while "sleeping"
 		sleepForDuration(1000) {
         	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
         }
@@ -261,7 +258,7 @@ def close()
 	def dInitStatus
     def dCurrentStatus = "closing"
     def dTotalSleep = 0
-    def dMaxSleep = 20000 // enough for an 8-foot door
+    def dMaxSleep = 15000 // enough for an 8-foot door
     
    	checkLogin()
     getDoorStatus() { dStatus -> dInitStatus = dStatus }
@@ -276,7 +273,6 @@ def close()
     
 	while (dCurrentStatus == "closing" && dTotalSleep <= dMaxSleep)
     {
-    	checkLogin()		// we might have exceeded our allotted time while "sleeping"
 		sleepForDuration(1000) {
             dTotalSleep += it
         	getDoorStatus(dInitStatus) { dStatus -> dCurrentStatus = dStatus }
@@ -397,7 +393,10 @@ def getDoorStatus(initialStatus = null, callback)
 	callApiGet("api/deviceattribute/getdeviceattribute", [], loginQParams) { response ->
         
     	def doorState = translateDoorStatus( response.data.AttributeValue, initialStatus )
-		calcLastActivityTime( response.data.UpdatedTime.toLong() )
+		calcLastActivityTime( response.data.UpdatedTime.toLong() ) 	// this is apparently the time the door started moving
+        															// not the time we sent the last command. For "close", 
+                                                                    // (at least some) doors will BEEP for a few seconds before
+                                                                    // actually moving the door.
         callback(doorState)        
     }
 }
@@ -433,7 +432,7 @@ def calcLastActivityTime(lastActivity)
 
 	if (diffTotal < 60000) lastActLabel = "${diffSeconds} Seconds"
 
-    sendEvent(name: "lastDoorAction", value: lastActLabel, descriptionText: "Open Time is $lastActLabel")
+    sendEvent(name: "lastDoorAction", value: lastActLabel, descriptionText: "$lastActLabel")
 }
 
 

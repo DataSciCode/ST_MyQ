@@ -247,7 +247,7 @@ def open()
 
 
 	setDoorState("opening", true)
-	setContactSensorState("open", true)		// Always open, unless it's closed
+//	setContactSensorState("open", true)		// Always open, unless it's closed
     
     state.opening = true					// keep refresh() from displaying that door isn't moving yet
     openDoor()
@@ -269,7 +269,8 @@ def open()
 	log.debug "Final Door Status: $dCurrentStatus"
 
 	setDoorState(dCurrentStatus, true)
-
+	setContactSensorState(dCurrentStatus, true)
+	
    	cmd = []
     cmd << "delay 2500"
 	cmd << refresh()
@@ -507,7 +508,7 @@ def setContactSensorState(newStatus, isStateChange = false)
     	sendEvent(name: "contact", value: "closed", display: true, isStateChange: true, descriptionText: "Contact is closed")
         sendEvent(name: "switch", value: "off", display: true, isStateChange: true, descriptionText: "Switch is off")
     }
-    else {
+    else if (newStatus == "open") {
 		sendEvent(name: "contact", value: "open", display: true, isStateChange: true, descriptionText: "Contact is open")
         sendEvent(name: "switch", value: "on", display: true, isStateChange: true, descriptionText: "Switch is on")
     }

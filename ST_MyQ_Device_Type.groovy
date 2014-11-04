@@ -178,16 +178,14 @@ def updated() {
 }
 
 def initialize() {
-     state.opening = false
-     state.pending = false
+     state.lastDoorStatus = "unknown"
+     state.lastContactStatus = "unknown"
+     state.lastActionLabel = "unknown"
 }
 
 // handle commands
 def poll() 
 {
-	log.debug "MyQ Garage door Polling"
-    
-   	checkLogin()
     refresh()   
 }
 
@@ -221,12 +219,14 @@ def off()
 
 def refresh()
 {    
-    if (!state.opening && !state.pending) {		// don't change the display until things get underway
-    	getDoorStatus() { dStatus ->
-    		setDoorState(dStatus, true)
-        	setContactSensorState(dStatus, true)
-    	}
-    }
+	checkLogin()
+    
+    getDoorStatus() { dStatus ->
+        log.debug "In refresh(), door status is $dStatus"
+   		
+        setDoorState(dStatus)
+       	setContactSensorState(dStatus)
+   	}
 }
 
 def open()
@@ -247,16 +247,13 @@ def open()
 
 
 	setDoorState("opening", true)
-//	setContactSensorState("open", true)		// Always open, unless it's closed
-    
-    state.opening = true					// keep refresh() from displaying that door isn't moving yet
+
     openDoor()
     
     while (dPendStatus != "opening") { 		// Wait until the door actually reports "opening"
     	cmd
         getDoorStatus() { dStatus -> dPendStatus = dStatus }
     }
-    state.opening = false
 
 	while (dCurrentStatus != "open")		// Now wait until the door tells us it is actually open
     {
@@ -271,10 +268,10 @@ def open()
 	setDoorState(dCurrentStatus, true)
 	setContactSensorState(dCurrentStatus, true)
 	
-   	cmd = []
-    cmd << "delay 2500"
-	cmd << refresh()
-	cmd
+//   	cmd = []
+//    cmd << "delay 2500"
+//	cmd << refresh()
+//	cmd
 }
 
 def close()
@@ -282,7 +279,7 @@ def close()
 	log.debug "Closing Door"
     
 	def dInitStatus
-    def dPendStatus = "foo"
+    def dPendStatus = "pending"
     def dTotalSleep = 0
     def dMaxSleep = 15000 // enough for an 8-foot doo
     def cmd = []
@@ -295,15 +292,13 @@ def close()
 	if (dInitStatus == "closing" || dInitStatus == "closed" || dInitStatus == "moving") { return  }
 
 	setDoorState("pending", true)
-    state.pending = true
     closeDoor()
     
     while ((dPendStatus != "closing") && (dPendStatus != "closed")) { // Wait until the door reports "closing"
     	cmd
         getDoorStatus() { dStatus -> dPendStatus = dStatus }
     }
-    state.pending = false
-    
+
     setDoorState(dPendStatus, true)
     def dCurrentStatus = dPendStatus
     
@@ -325,10 +320,10 @@ def close()
 	setDoorState(dCurrentStatus, true)
 	setContactSensorState(dCurrentStatus, true)
 	
-	cmd = []
-    cmd << "delay 2500"
-	cmd << refresh()
-	cmd
+//	cmd = []
+//    cmd << "delay 2500"
+//	cmd << refresh()
+//	cmd
 }
 
 def checkLogin()
@@ -467,8 +462,11 @@ def calcLastActivityTime(lastActivity)
 	if (diffDays == 0 && diffMinutes > 1) lastActLabel += "${diffMinutes} Minutes"
 
 	if (diffTotal < 60000) lastActLabel = "${diffSeconds} Seconds"
-
-    sendEvent(name: "lastDoorAction", value: lastActLabel, descriptionText: "$lastActLabel", display: true, isStateChange: true)
+    
+    if (lastActLabel != state.lastActionLabel) {
+    	state.lastActionLabel = lastActLabel
+	    sendEvent(name: "lastDoorAction", value: lastActLabel, descriptionText: "$lastActLabel", display: true, isStateChange: true)
+    }
 }
 
 
@@ -499,30 +497,38 @@ def closeDoor()
 }
 
 
-def setContactSensorState(newStatus, isStateChange = false)
+def setContactSensorState(newStatus, isStateChangeX = false)
 {
-	log.debug "Setting contact status to $newStatus, state is $isStateChange"
-    
-    // Sync contact sensor - closed/off ONLY if door status is closed
+    def chg = false
+   	if (newStatus != state.lastContactStatus) {
+   		chg = true
+   		state.lastContactStatus = newStatus
+   	}
+
+
+
     if (newStatus == "closed") {
-    	sendEvent(name: "contact", value: "closed", display: true, isStateChange: true, descriptionText: "Contact is closed")
-        sendEvent(name: "switch", value: "off", display: true, isStateChange: true, descriptionText: "Switch is off")
+    	log.debug "Setting contact/switch status to $newStatus, state is $chg"
+    	sendEvent(name: "contact", value: "closed", display: true, isStateChange: chg, descriptionText: "Contact is closed")
+        sendEvent(name: "switch", value: "off", display: true, isStateChange: chg, descriptionText: "Switch is off")
     }
     else if (newStatus == "open") {
-		sendEvent(name: "contact", value: "open", display: true, isStateChange: true, descriptionText: "Contact is open")
-        sendEvent(name: "switch", value: "on", display: true, isStateChange: true, descriptionText: "Switch is on")
+    	log.debug "Setting contact/switch status to $newStatus, state is $chg"
+		sendEvent(name: "contact", value: "open", display: true, isStateChange: chg, descriptionText: "Contact is open")
+        sendEvent(name: "switch", value: "on", display: true, isStateChange: chg, descriptionText: "Switch is on")
     }
 }
 
 
-def setDoorState(newStatus, isStateChange = false)
-{
-	log.debug "Setting door status to $newStatus, state $isStateChange"
-    
-	if (isStateChange == true) {
+def setDoorState(newStatus, isStateChangeX = false)
+{ 
+    if (newStatus != state.lastDoorStatus) {
+		log.debug "Setting door status to $newStatus, state is true"
+		state.lastDoorStatus = newStatus
         sendEvent(name: "status", value: "${newStatus}", isStateChange: true, display: true, descriptionText: "Door is $newStatus")
     }
     else {
+		log.debug "Setting door status to $newStatus, state is false"
 		sendEvent(name: "status", value: "${newStatus}", display: true, descriptionText: "Door is $newStatus")
     }
 }

@@ -48,6 +48,7 @@ preferences
     input("username", "text", title: "Username", description: "MyQ username (email address)")
     input("password", "password", title: "Password", description: "MyQ password")
     input("door_name", "text", title: "Door Name", description: "MyQ Garage Door name or Device ID")
+    input("is_craftsman", "enum", title: "Is your opener a Craftsman Assurelink?", metadata:[values:["Yes","No"]])
 }
 
 metadata 
@@ -161,8 +162,9 @@ def installed() {
     state.DeviceID = 0
     initialize()
     
-    checkLogin()
-    refresh()
+    //disable checking of login when first installing the app
+    //checkLogin()
+    //refresh()
 }
 
 
@@ -587,7 +589,8 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
 
     def finalQParams = [
     
-    	ApplicationId: "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx",
+    	//ApplicationId: "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx",
+    	ApplicationId : getVarParams().AppID,
         DeviceId: state.DeviceID,
     	securityToken: state.Login.SecToken
         
@@ -595,7 +598,8 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
    
     def finalParams = [ 
     
-    	uri: baseURL, 
+    	//uri: baseURL,
+    	uri: getVarParams().BaseURL, 
         path: apipath, 
         headers: finalHeaders,
         contentType: "application/json; charset=utf-8",
@@ -624,6 +628,19 @@ def callApiPut(apipath, headers = [], queryParams = [], callback = {})
     }
 }
 
+//Switch base on the setting flag controll MyQ vs. Craftsmand
+def getVarParams() {
+	def baseURL = "https://myqexternal.myqdevice.com/"
+	def dParams = [
+		BaseURL: "https://myqexternal.myqdevice.com/",
+        AppID: "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx"
+	]
+    if ((settings.is_craftsman ?: "No") == "Yes") {    
+		dParams.BaseURL = "https://craftexternal.myqdevice.com/"
+        dParams.AppID = "eU97d99kMG4t3STJZO/Mu2wt69yTQwM0WXZA5oZ74/ascQ2xQrLD/yjeVhEQccBZ"
+    }
+	return dParams
+}
 
 def callApiGet(apipath, headers = [], queryParams = [], callback = {})
 {
@@ -634,15 +651,16 @@ def callApiGet(apipath, headers = [], queryParams = [], callback = {})
     ] + headers
     
     def finalQParams = [
-    
-    	appId: "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx",
+	//appId : "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx",
+    	appId: getVarParams().AppID,
         filterOn: "true"
     
     ] + queryParams
     
     def finalParams = [ 
     
-    	uri: baseURL, 
+    	//uri: baseURL,
+    	uri: getVarParams().BaseURL, 
         path: apipath, 
         headers: finalHeaders,
         query: finalQParams
